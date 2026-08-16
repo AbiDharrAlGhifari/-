@@ -392,9 +392,7 @@ main{
   position:relative;
   display:inline-block;
   color:var(--brass-soft);
-  font-family:'ThmanyahSans';
-  font-size:13.5px;
-  font-weight:900;
+  font-size:14px;
   line-height:1;
 }
 .coupon-count.redeemed-count b .strike{
@@ -410,16 +408,6 @@ main{
 .coupon-count.redeemed-count .count-line > span:last-child{
   color:var(--cream-faint);
   font-size:8.5px;
-  font-weight:700;
-}
-.coupon-count.redeemed-count .count-line{
-  color:var(--cream-faint);
-}
-.coupon-count.redeemed-count .count-line b{
-  color:var(--brass-soft);
-}
-.coupon-count.redeemed-count .remaining-note{
-  color:var(--brass-soft);
 }
 .remaining-note{
   position:absolute;
@@ -454,9 +442,6 @@ main{
   pointer-events:none;
   user-select:none;
 }
-.student-card.redeemed .coupon-count.redeemed-count b{ color:var(--brass-soft) !important; }
-.student-card.redeemed .remaining-note{ color:var(--brass-soft) !important; }
-
 .student-card.redeemed .tiers-row-wrap::before{
   content:""; position:absolute; inset:0; z-index:3; pointer-events:none;
   background:rgba(11,18,14,.26);
@@ -540,17 +525,6 @@ footer.site-foot{ text-align:center; padding:22px 20px 36px; color:var(--cream-f
   h1.lb-title{ font-size:17px; }
   .title-coupon-inline{ width:3.3em; margin-inline-start:.25em; }
 }
-
-/* ===== REDEMPTION MODE — final visual lock ===== */
-.student-card.redeemed .tiers-row-wrap{ position:relative !important; overflow:hidden !important; }
-.student-card.redeemed .tiers-row{ filter:blur(5px) saturate(.72) !important; }
-.student-card.redeemed .redeemed-overlay{
-  display:flex !important; visibility:visible !important; opacity:1 !important;
-  position:absolute !important; inset:7px 0 0 0 !important; z-index:999 !important;
-}
-.student-card.redeemed .redeemed-badge{ display:block !important; visibility:visible !important; opacity:1 !important; font-size:8px !important; }
-.student-card.redeemed .coupon-count.redeemed-count b{ color:var(--brass-soft) !important; }
-.student-card.redeemed .remaining-note{ color:var(--brass-soft) !important; }
 </style>
 </head>
 <body class="locked">
@@ -678,39 +652,6 @@ var SHEET_GID = "569976092";
 function gvizUrl(){
   return "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:json&gid=" + SHEET_GID + "&t=" + Date.now();
 }
-function gvizCsvUrl(){
-  return "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&gid=" + SHEET_GID + "&t=" + Date.now();
-}
-function parseCsv(text){
-  var rows=[], row=[], cell="", quoted=false;
-  for(var i=0;i<text.length;i++){
-    var ch=text[i], nx=text[i+1];
-    if(quoted){
-      if(ch==='"' && nx==='"'){ cell+='"'; i++; }
-      else if(ch==='"'){ quoted=false; }
-      else cell+=ch;
-    }else{
-      if(ch==='"') quoted=true;
-      else if(ch===','){ row.push(cell); cell=""; }
-      else if(ch==='\n'){ row.push(cell); rows.push(row); row=[]; cell=""; }
-      else if(ch==='\r'){ /* ignore CR */ }
-      else cell+=ch;
-    }
-  }
-  row.push(cell); if(row.length>1 || row[0]!=="") rows.push(row);
-  return rows;
-}
-function parseCsvData(text){
-  var rows=parseCsv(text), h1=[], h2=[];
-  rows.forEach(function(r, i){
-    if(i===0 && /^(A|الاسم|name)$/i.test(String(r[0]).trim())) return;
-    var n1=String(r[0]||"").trim(), c1=String(r[1]||"");
-    var n2=String(r[2]||"").trim(), c2=String(r[3]||"");
-    if(n1){ var e1=buildEntry(n1,{v:c1,f:c1}); if(e1) h1.push(e1); }
-    if(n2){ var e2=buildEntry(n2,{v:c2,f:c2}); if(e2) h2.push(e2); }
-  });
-  return {h1:h1,h2:h2};
-}
 
 var HALAQA1_NAME = "حلقة أبو بكر الصديق";
 var HALAQA2_NAME = "حلقة عثمان بن عفان";
@@ -750,16 +691,18 @@ var LOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 function icon(key){ return (window.ASSETS.icons && window.ASSETS.icons[key]) || ""; }
 
 function cellRawText(cell){
-  if(!cell) return "";
-  // في GViz قد يكون v رقمًا بينما f هو النص الظاهر للمستخدم، لذلك نفضّل
-  // النص المنسّق عندما يحتوي على عبارة الصرف. هذا يمنع فقدان حالة الطالب.
+  if(cell === null || cell === undefined) return "";
+  if(typeof cell === "string" || typeof cell === "number") return String(cell);
   var v = cell.v;
   var f = cell.f;
-  var vf = (f !== null && f !== undefined) ? String(f) : "";
-  if(vf && /تم\s*صرف|كوبون/.test(normalizeDigits(vf))) return vf;
-  if(v !== null && v !== undefined && String(v) !== "") return String(v);
-  if(vf) return vf;
-  return "";
+  var vv = (v !== null && v !== undefined) ? String(v) : "";
+  var ff = (f !== null && f !== undefined) ? String(f) : "";
+  var vn = normalizeDigits(vv), fn = normalizeDigits(ff);
+  // Prefer the field containing the literal redemption phrase.
+  if(ff && /تم\s*صرف/.test(fn) && /كوبون/.test(fn)) return ff;
+  if(vv && /تم\s*صرف/.test(vn) && /كوبون/.test(vn)) return vv;
+  if(ff && /كوبون/.test(fn)) return ff;
+  return vv || ff || "";
 }
 
 function normalizeDigits(str){
@@ -777,27 +720,24 @@ function digitsIn(str){
 // نعتمد على وجود "تم صرف" و"كوبون" بدل مطابقة حرفية ضيقة حتى لا يختفي الطالب.
 function parseRedemptionText(text){
   var raw = normalizeDigits(text == null ? "" : String(text));
-  var compact = raw
-    .replace(/[\u2000-\u200F\u202A-\u202E]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  // يجب أن تكون عبارة الصرف موجودة صراحة.
+  var compact = raw.replace(/[\u2000-\u200F\u202A-\u202E]/g," ")
+    .replace(/\s+/g," ").trim();
   if(!/تم\s*صرف/.test(compact) || !/كوبون/.test(compact)) return null;
 
-  // الرقم الأساسي هو أول رقم في الخلية، حتى لو كان Google Sheets يرجع النص بتنسيق مختلف.
-  var totalMatch = compact.match(/(\d+(?:[.٠١٢٣٤٥٦٧٨٩]+)?)/);
-  if(!totalMatch) return null;
-  var total = Number(totalMatch[1]);
+  // First number = the student's real coupon total.
+  var nums = compact.match(/\d+(?:\.\d+)?/g) || [];
+  if(!nums.length) return null;
+  var total = Number(nums[0]);
   if(!Number.isFinite(total)) return null;
 
-  // في "تم صرف الكوبون" لا يوجد رقم للصرف، وبالتالي المصروف = الإجمالي.
-  var spentMatch = compact.match(/تم\s*صرف\s*(\d+)/);
+  // A numeric amount after "تم صرف" is the spent amount.
+  // Without a number, the whole total is considered spent.
+  var spentMatch = compact.match(/تم\s*صرف\s*(\d+(?:\.\d+)?)/);
   var spent = spentMatch ? Number(spentMatch[1]) : total;
   if(!Number.isFinite(spent)) spent = total;
+  spent = Math.max(0, Math.min(total, spent));
 
-  var remaining = Math.max(0, total - spent);
-  return {total: total, spent: spent, remaining: remaining};
+  return {total:total, spent:spent, remaining:Math.max(0,total-spent)};
 }
 
 function buildEntry(name, countCell){
@@ -806,6 +746,12 @@ function buildEntry(name, countCell){
 
   var countText = cellRawText(countCell);
   var redemption = parseRedemptionText(countText);
+  if(!redemption && countCell){
+    var candidates = [countCell.f, countCell.v];
+    for(var ci=0; ci<candidates.length && !redemption; ci++){
+      if(candidates[ci] !== null && candidates[ci] !== undefined) redemption = parseRedemptionText(candidates[ci]);
+    }
+  }
   if(redemption){
     return {
       name: cleanName, count: redemption.total, redeemed: true,
@@ -842,44 +788,33 @@ function parseGviz(text){
 }
 
 function loadData(silent){
-  // المصدر الأساسي CSV لأنّه يعيد النص الظاهر في الخلية كما هو، بما فيه
-  // "39 (تم صرف 25 كوبون)". هذا يتجنب مشكلة GViz التي قد تعيد الرقم وحده في v.
-  return fetch(gvizCsvUrl(), {cache:"no-store"})
+  return fetch(gvizUrl(), {cache:"no-store"})
     .then(function(res){
-      if(!res.ok) throw new Error("bad CSV status " + res.status);
+      if(!res.ok) throw new Error("bad status " + res.status);
       return res.text();
     })
     .then(function(text){
-      var parsed=parseCsvData(text);
-      if(parsed.h1.length===0 && parsed.h2.length===0) throw new Error("empty CSV sheet");
-      state.halaqa1=parsed.h1; state.halaqa2=parsed.h2;
-      state.lastUpdated=new Date(); state.usingFallback=false;
+      var parsed = parseGviz(text);
+      if(parsed.h1.length === 0 && parsed.h2.length === 0) throw new Error("empty sheet");
+      state.halaqa1 = parsed.h1;
+      state.halaqa2 = parsed.h2;
+      state.lastUpdated = new Date();
+      state.usingFallback = false;
       updateRankChanges();
       return true;
     })
-    .catch(function(csvErr){
-      // احتياط ثانٍ: GViz JSON القديم.
-      return fetch(gvizUrl(), {cache:"no-store"})
-        .then(function(res){ if(!res.ok) throw new Error("bad JSON status " + res.status); return res.text(); })
-        .then(function(text){
-          var parsed=parseGviz(text);
-          if(parsed.h1.length===0 && parsed.h2.length===0) throw new Error("empty JSON sheet");
-          state.halaqa1=parsed.h1; state.halaqa2=parsed.h2;
-          state.lastUpdated=new Date(); state.usingFallback=false;
-          updateRankChanges(); return true;
-        })
-        .catch(function(err){
-          if(!silent) console.warn("تعذّر تحميل Google Sheets، سيتم استخدام آخر نسخة محفوظة:", csvErr, err);
-          if(state.halaqa1.length===0 && state.halaqa2.length===0){
-            state.halaqa1=window.FALLBACK_DATA.h1.slice();
-            state.halaqa2=window.FALLBACK_DATA.h2.slice();
-            state.lastUpdated=new Date(window.FALLBACK_DATA.savedAt);
-            state.usingFallback=true;
-          }
-          return false;
-        });
+    .catch(function(err){
+      if(!silent) console.warn("تعذّر تحميل بيانات الشيت مباشرة، سيتم استخدام آخر نسخة محفوظة:", err);
+      if(state.halaqa1.length === 0 && state.halaqa2.length === 0){
+        state.halaqa1 = window.FALLBACK_DATA.h1.slice();
+        state.halaqa2 = window.FALLBACK_DATA.h2.slice();
+        state.lastUpdated = new Date(window.FALLBACK_DATA.savedAt);
+        state.usingFallback = true;
+      }
+      return false;
     });
 }
+
 function fmtDate(d){
   if(!d) return "";
   try{
@@ -991,8 +926,8 @@ function freezeRedeemedRanks(viewKey, rawList){
   var raw = rawList.slice().sort(sortByCount);
   var prev = state.prevRanksByView[viewKey] || {};
 
-  // عند بداية الصرف: نحفظ مركز الطالب الحالي كمرساة.
-  // لكن لا نمنع طالبًا غير مصروف من تجاوز الطالب إذا أصبح رقمه أكبر.
+  // أول لحظة للصرف: ثبّت الطالب في نفس الخانة التي كان عليها قبل ظهور عبارة الصرف.
+  // في أول تحميل، لا توجد رتبة سابقة، لذلك نستخدم ترتيب الرقم الأساسي نفسه.
   raw.forEach(function(item, idx){
     if(item.redeemed && locks[item.name] === undefined){
       var oldRank = prev[item.name];
@@ -1000,7 +935,7 @@ function freezeRedeemedRanks(viewKey, rawList){
     }
   });
 
-  // عند حذف عبارة الصرف، يزال القفل فورًا ويعود الطالب للترتيب الطبيعي.
+  // عند حذف عبارة الصرف من Google Sheets، يسقط التثبيت مباشرة.
   Object.keys(locks).forEach(function(name){
     var found = raw.some(function(item){ return item.name === name && item.redeemed; });
     if(!found) delete locks[name];
@@ -1013,43 +948,32 @@ function freezeRedeemedRanks(viewKey, rawList){
 function applyFrozenRanks(viewKey, rawList){
   var locks = state.frozenRanksByView[viewKey];
   var sorted = rawList.slice().sort(sortByCount);
-  var result = [];
+  var result = new Array(sorted.length);
+  var free = [];
 
-  // الطلاب غير المصروفين أصحاب الرقم الأعلى يتقدمون طبيعيًا.
-  // الطالب المصروف يحافظ على مرساته ما دام لا يوجد طالب أعلى منه.
-  var pending = sorted.filter(function(item){ return !item.redeemed; });
-  var redeemed = sorted.filter(function(item){ return item.redeemed; });
-
-  redeemed.sort(function(a,b){
-    var ra = locks[a.name];
-    var rb = locks[b.name];
-    if(a.count !== b.count) return b.count - a.count;
-    return (ra === undefined ? 999999 : ra) - (rb === undefined ? 999999 : rb);
+  sorted.forEach(function(item){
+    var lockedRank = item.redeemed ? locks[item.name] : undefined;
+    if(lockedRank !== undefined){
+      var pos = Math.max(0, Math.min(sorted.length - 1, lockedRank));
+      // في حال تعارض نبحث عن أقرب خانة حرة، مع إبقاء ترتيب الصرف ثابتًا قدر الإمكان.
+      while(pos < result.length && result[pos]) pos++;
+      if(pos >= result.length){
+        pos = lockedRank;
+        while(pos >= 0 && result[pos]) pos--;
+      }
+      if(pos >= 0){
+        result[pos] = item;
+        return;
+      }
+    }
+    free.push(item);
   });
 
-  redeemed.forEach(function(item){
-    var originalIndex = (locks[item.name] === undefined ? sorted.indexOf(item) : locks[item.name]);
-    var higherLive = pending.filter(function(other){ return other.sortCount > item.sortCount; }).length;
-    var desired = Math.max(higherLive, originalIndex);
-
-    // إذا وجد طالب أعلى، يتحرك المصروف إلى ما بعد جميع أصحاب الأرقام الأعلى.
-    // أما التغييرات أسفل مستواه فلا تغيّر مركزه.
-    var insertAt = Math.min(desired, pending.length + result.length);
-    item.__frozenInsert = insertAt;
-  });
-
-  // إدراج الطلاب المصروفين حسب المرساة، مع السماح فقط بتجاوزهم من أصحاب الأرقام الأعلى.
-  result = pending.slice();
-  redeemed.sort(function(a,b){ return (a.__frozenInsert||0) - (b.__frozenInsert||0); });
-  redeemed.forEach(function(item){
-    var pos = item.__frozenInsert || 0;
-    if(pos > result.length) pos = result.length;
-    result.splice(pos, 0, item);
-  });
-
-  result.forEach(function(item){ delete item.__frozenInsert; });
+  var fi = 0;
+  for(var i=0;i<result.length;i++) if(!result[i]) result[i] = free[fi++];
   return result;
 }
+
 function currentList(viewKey){
   var v = viewKey || state.view;
   var list;
@@ -1061,8 +985,11 @@ function currentList(viewKey){
     list = state.halaqa1.map(function(s){ return toDisplayItem(s, HALAQA1_NAME); })
       .concat(state.halaqa2.map(function(s){ return toDisplayItem(s, HALAQA2_NAME); }));
   }
-  freezeRedeemedRanks(v, list);
-  return applyFrozenRanks(v, list);
+  // Redemption does NOT reduce the student's score. The displayed total
+  // remains the first number in the sheet cell, so ordinary sorting gives
+  // exactly the requested behavior: the redeemed student stays put until
+  // another student actually exceeds that total.
+  return list.sort(sortByCount);
 }
 
 function updateRankChanges(){
@@ -1232,7 +1159,6 @@ function render(){
       '</div>';
     } else {
       wrap.innerHTML = list.map(function(s, idx){ return studentCardHtml(s, idx+1); }).join("");
-      enforceRedemptionVisuals();
     }
   }
 }
@@ -1241,21 +1167,6 @@ function injectAssets(){
   document.getElementById("splashLogo").src = window.ASSETS.logo;
   document.getElementById("headerLogo").src = window.ASSETS.logo;
   document.getElementById("couponFlagImg").src = window.ASSETS.coupon;
-}
-
-function enforceRedemptionVisuals(){
-  document.querySelectorAll('.student-card[data-redeemed="1"]').forEach(function(card){
-    card.classList.add('redeemed');
-    var wrap=card.querySelector('.tiers-row-wrap');
-    if(!wrap) return;
-    var overlay=wrap.querySelector('.redeemed-overlay');
-    if(!overlay){
-      overlay=document.createElement('div');
-      overlay.className='redeemed-overlay';
-      overlay.innerHTML='<span class="redeemed-badge">تم صرف الكوبون</span>';
-      wrap.appendChild(overlay);
-    }
-  });
 }
 
 function bindUi(){
