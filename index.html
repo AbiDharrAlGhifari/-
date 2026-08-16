@@ -391,8 +391,10 @@ main{
 .coupon-count.redeemed-count b{
   position:relative;
   display:inline-block;
-  color:var(--cream-faint);
-  font-size:14px;
+  color:var(--brass-soft);
+  font-family:'ThmanyahSans';
+  font-size:13.5px;
+  font-weight:900;
   line-height:1;
 }
 .coupon-count.redeemed-count b .strike{
@@ -408,6 +410,16 @@ main{
 .coupon-count.redeemed-count .count-line > span:last-child{
   color:var(--cream-faint);
   font-size:8.5px;
+  font-weight:700;
+}
+.coupon-count.redeemed-count .count-line{
+  color:var(--cream-faint);
+}
+.coupon-count.redeemed-count .count-line b{
+  color:var(--brass-soft);
+}
+.coupon-count.redeemed-count .remaining-note{
+  color:var(--brass-soft);
 }
 .remaining-note{
   position:absolute;
@@ -442,6 +454,9 @@ main{
   pointer-events:none;
   user-select:none;
 }
+.student-card.redeemed .coupon-count.redeemed-count b{ color:var(--brass-soft) !important; }
+.student-card.redeemed .remaining-note{ color:var(--brass-soft) !important; }
+
 .student-card.redeemed .tiers-row-wrap::before{
   content:""; position:absolute; inset:0; z-index:3; pointer-events:none;
   background:rgba(11,18,14,.26);
@@ -657,7 +672,7 @@ var HALAQA1_NAME = "حلقة أبو بكر الصديق";
 var HALAQA2_NAME = "حلقة عثمان بن عفان";
 var AUTO_REFRESH_MS = 8000;
 
-var FROZEN_RANKS_STORAGE_KEY = "couponLeaderboardFrozenRanks_v5";
+var FROZEN_RANKS_STORAGE_KEY = "couponLeaderboardFrozenRanks_v6";
 function loadFrozenRanks(){
   try{
     var saved = localStorage.getItem(FROZEN_RANKS_STORAGE_KEY);
@@ -921,8 +936,8 @@ function freezeRedeemedRanks(viewKey, rawList){
   var raw = rawList.slice().sort(sortByCount);
   var prev = state.prevRanksByView[viewKey] || {};
 
-  // أول لحظة للصرف: ثبّت الطالب في نفس الخانة التي كان عليها قبل ظهور عبارة الصرف.
-  // في أول تحميل، لا توجد رتبة سابقة، لذلك نستخدم ترتيب الرقم الأساسي نفسه.
+  // عند بداية الصرف: نحفظ مركز الطالب الحالي كمرساة.
+  // لكن لا نمنع طالبًا غير مصروف من تجاوز الطالب إذا أصبح رقمه أكبر.
   raw.forEach(function(item, idx){
     if(item.redeemed && locks[item.name] === undefined){
       var oldRank = prev[item.name];
@@ -930,7 +945,7 @@ function freezeRedeemedRanks(viewKey, rawList){
     }
   });
 
-  // عند حذف عبارة الصرف من Google Sheets، يسقط التثبيت مباشرة.
+  // عند حذف عبارة الصرف، يزال القفل فورًا ويعود الطالب للترتيب الطبيعي.
   Object.keys(locks).forEach(function(name){
     var found = raw.some(function(item){ return item.name === name && item.redeemed; });
     if(!found) delete locks[name];
@@ -943,32 +958,43 @@ function freezeRedeemedRanks(viewKey, rawList){
 function applyFrozenRanks(viewKey, rawList){
   var locks = state.frozenRanksByView[viewKey];
   var sorted = rawList.slice().sort(sortByCount);
-  var result = new Array(sorted.length);
-  var free = [];
+  var result = [];
 
-  sorted.forEach(function(item){
-    var lockedRank = item.redeemed ? locks[item.name] : undefined;
-    if(lockedRank !== undefined){
-      var pos = Math.max(0, Math.min(sorted.length - 1, lockedRank));
-      // في حال تعارض نبحث عن أقرب خانة حرة، مع إبقاء ترتيب الصرف ثابتًا قدر الإمكان.
-      while(pos < result.length && result[pos]) pos++;
-      if(pos >= result.length){
-        pos = lockedRank;
-        while(pos >= 0 && result[pos]) pos--;
-      }
-      if(pos >= 0){
-        result[pos] = item;
-        return;
-      }
-    }
-    free.push(item);
+  // الطلاب غير المصروفين أصحاب الرقم الأعلى يتقدمون طبيعيًا.
+  // الطالب المصروف يحافظ على مرساته ما دام لا يوجد طالب أعلى منه.
+  var pending = sorted.filter(function(item){ return !item.redeemed; });
+  var redeemed = sorted.filter(function(item){ return item.redeemed; });
+
+  redeemed.sort(function(a,b){
+    var ra = locks[a.name];
+    var rb = locks[b.name];
+    if(a.count !== b.count) return b.count - a.count;
+    return (ra === undefined ? 999999 : ra) - (rb === undefined ? 999999 : rb);
   });
 
-  var fi = 0;
-  for(var i=0;i<result.length;i++) if(!result[i]) result[i] = free[fi++];
+  redeemed.forEach(function(item){
+    var originalIndex = (locks[item.name] === undefined ? sorted.indexOf(item) : locks[item.name]);
+    var higherLive = pending.filter(function(other){ return other.sortCount > item.sortCount; }).length;
+    var desired = Math.max(higherLive, originalIndex);
+
+    // إذا وجد طالب أعلى، يتحرك المصروف إلى ما بعد جميع أصحاب الأرقام الأعلى.
+    // أما التغييرات أسفل مستواه فلا تغيّر مركزه.
+    var insertAt = Math.min(desired, pending.length + result.length);
+    item.__frozenInsert = insertAt;
+  });
+
+  // إدراج الطلاب المصروفين حسب المرساة، مع السماح فقط بتجاوزهم من أصحاب الأرقام الأعلى.
+  result = pending.slice();
+  redeemed.sort(function(a,b){ return (a.__frozenInsert||0) - (b.__frozenInsert||0); });
+  redeemed.forEach(function(item){
+    var pos = item.__frozenInsert || 0;
+    if(pos > result.length) pos = result.length;
+    result.splice(pos, 0, item);
+  });
+
+  result.forEach(function(item){ delete item.__frozenInsert; });
   return result;
 }
-
 function currentList(viewKey){
   var v = viewKey || state.view;
   var list;
