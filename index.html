@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>ترتيب الطلاب الحاصلين على الكوبون — مجمع أبي ذر الغفاري</title>
+<meta name="coupon-engine-version" content="redeemed-lock-v7">
 <style>
 @font-face{
   font-family: 'ThmanyahSans';
@@ -463,20 +464,20 @@ main{
   backdrop-filter:blur(1.5px); -webkit-backdrop-filter:blur(1.5px);
 }
 .redeemed-overlay{
-  position:absolute; inset:7px 0 0 0;
+  position:absolute !important; inset:0 !important;
   display:flex; align-items:center; justify-content:center;
-  pointer-events:none; z-index:5;
+  pointer-events:none !important; z-index:50 !important;
   border:1px solid rgba(230,191,101,.82);
   border-radius:14px;
-  background:rgba(11,18,14,.30);
+  background:rgba(11,18,14,.30) !important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 8px 24px rgba(0,0,0,.12);
   backdrop-filter:blur(2px);
   -webkit-backdrop-filter:blur(2px);
 }
 .redeemed-badge{
   font-family:'ThmanyahSans',Tahoma,Arial,sans-serif;
-  font-size:8px; line-height:1.35; font-weight:900;
-  color:#fffdf7;
+  font-size:8px !important; line-height:1.35; font-weight:900;
+  color:#fffdf7 !important;
   background:rgba(18,22,20,.64);
   border:1px solid rgba(230,191,101,.95);
   padding:7px 15px;
@@ -488,107 +489,6 @@ main{
   -webkit-backdrop-filter:blur(9px) saturate(125%);
   white-space:nowrap;
   letter-spacing:0;
-}
-
-/* Final redeemed visual rules: keep the big number clearly yellow, strike only, and show the small remaining amount. */
-.student-card.redeemed .coupon-count.redeemed-count{
-  position:relative;
-  min-width:88px;
-  min-height:34px;
-  align-items:flex-end;
-  justify-content:flex-start;
-}
-.student-card.redeemed .coupon-count.redeemed-count .count-line{
-  display:flex;
-  align-items:baseline;
-  gap:4px;
-  position:relative;
-  z-index:4;
-}
-.student-card.redeemed .coupon-count.redeemed-count .redeemed-total{
-  color:var(--brass-soft) !important;
-  font-family:'ThmanyahSans',Tahoma,Arial,sans-serif;
-  font-size:13.5px !important;
-  font-weight:900;
-  position:relative;
-  line-height:1;
-}
-.student-card.redeemed .coupon-count.redeemed-count .strike{
-  position:absolute;
-  left:-5px; right:-5px; top:52%;
-  height:2px;
-  background:#d74a3e;
-  border-radius:3px;
-  transform:rotate(-10deg);
-  transform-origin:center;
-  box-shadow:0 0 0 1px rgba(215,74,62,.06);
-}
-.student-card.redeemed .coupon-count.redeemed-count .count-line > span:last-child{
-  color:var(--brass-soft) !important;
-  font-size:8.5px;
-}
-.student-card.redeemed .remaining-note{
-  position:absolute;
-  top:-8px;
-  left:0;
-  right:auto;
-  color:var(--brass-soft) !important;
-  font-family:'ThmanyahSans',Tahoma,Arial,sans-serif;
-  font-size:8px !important;
-  font-weight:900;
-  line-height:1.1;
-  animation:remainingBounce 1.15s ease-in-out infinite;
-  z-index:6;
-  white-space:nowrap;
-}
-
-.student-card.redeemed .tiers-row-wrap{
-  position:relative;
-  border:1px solid rgba(230,191,101,.65);
-  border-radius:16px;
-  overflow:hidden;
-}
-.student-card.redeemed .tiers-row{
-  filter:blur(5px) saturate(.72);
-}
-.student-card.redeemed .tiers-row-wrap::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  z-index:3;
-  pointer-events:none;
-  background:rgba(11,18,14,.25);
-  backdrop-filter:blur(2px);
-  -webkit-backdrop-filter:blur(2px);
-}
-.redeemed-overlay{
-  position:absolute;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  pointer-events:none;
-  z-index:5;
-  background:rgba(11,18,14,.12);
-  border:1px solid rgba(230,191,101,.75);
-  border-radius:14px;
-}
-.redeemed-badge{
-  font-family:'ThmanyahSans',Tahoma,Arial,sans-serif;
-  font-size:8px !important;
-  line-height:1.4;
-  font-weight:900;
-  color:#fffdf7;
-  background:rgba(18,22,20,.72);
-  border:1px solid rgba(230,191,101,.95);
-  padding:7px 15px;
-  min-width:118px;
-  text-align:center;
-  border-radius:12px;
-  box-shadow:0 10px 22px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.14);
-  backdrop-filter:blur(9px) saturate(125%);
-  -webkit-backdrop-filter:blur(9px) saturate(125%);
-  white-space:nowrap;
 }
 
 .badge{ position:relative; width:56px; flex:none; display:flex; flex-direction:column; align-items:center; gap:3px; }
@@ -775,14 +675,21 @@ var AUTO_REFRESH_MS = 8000;
 
 var FROZEN_RANKS_STORAGE_KEY = "couponLeaderboardFrozenRanks_v6";
 function loadFrozenRanks(){
-  return {all:{}, h1:{}, h2:{}};
+  try{
+    var saved = localStorage.getItem(FROZEN_RANKS_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : {all:{}, h1:{}, h2:{}};
+  }catch(e){ return {all:{}, h1:{}, h2:{}}; }
 }
-function persistFrozenRanks(){ /* ranking is derived from current coupon values */ }
+function persistFrozenRanks(){
+  try{ localStorage.setItem(FROZEN_RANKS_STORAGE_KEY, JSON.stringify(state.frozenRanksByView)); }catch(e){}
+}
 
 var state = {
   halaqa1: [], halaqa2: [], view: "all", lastUpdated: null, usingFallback: false,
   prevRanksByView: {all:{}, h1:{}, h2:{}}, rankChanges: {},
-  frozenRanksByView: {all:{}, h1:{}, h2:{}}
+  // أثناء حالة الصرف نثبت خانة الطالب نفسها، لا الرقم فقط.
+  // والحفظ المحلي يجعل المركز ثابتًا حتى بعد إعادة تحميل الصفحة.
+  frozenRanksByView: loadFrozenRanks()
 };
 
 var ICON_LABELS = {
@@ -806,8 +713,10 @@ function cellRawText(cell){
   var v = cell.v;
   var f = cell.f;
   var vf = (f !== null && f !== undefined) ? String(f) : "";
+  var vv = (v !== null && v !== undefined) ? String(v) : "";
   if(vf && /تم\s*صرف|كوبون/.test(normalizeDigits(vf))) return vf;
-  if(v !== null && v !== undefined && String(v) !== "") return String(v);
+  if(vv && /تم\s*صرف|كوبون/.test(normalizeDigits(vv))) return vv;
+  if(vv !== "") return vv;
   if(vf) return vf;
   return "";
 }
@@ -1013,23 +922,82 @@ function buildDropdown(){
 function toDisplayItem(s, tag){
   var redeemed = !!s.redeemed;
   return {
-    name:s.name,
-    count:s.count,
-    tag:tag,
-    redeemed:redeemed,
-    sortCount:s.count,
-    remaining:(s.remaining !== undefined ? s.remaining : null),
-    spentAmount:(s.spentAmount !== undefined ? s.spentAmount : null)
+    name:s.name, count:s.count, tag:tag, redeemed:redeemed, sortCount:s.count,
+    remaining: (s.remaining !== undefined ? s.remaining : null),
+    spentAmount: (s.spentAmount !== undefined ? s.spentAmount : null)
   };
 }
 
 function sortByCount(a,b){
-  var diff = (Number(b.sortCount)||0) - (Number(a.sortCount)||0);
+  var diff = b.sortCount - a.sortCount;
   if(diff !== 0) return diff;
-  // لا نغيّر ترتيب المتعادلين بشكل عشوائي أثناء التحديثات.
-  return String(a.name).localeCompare(String(b.name), "ar");
+  return String(a.name).localeCompare(String(b.name), 'ar');
 }
 
+function freezeRedeemedRanks(viewKey, rawList){
+  var locks = state.frozenRanksByView[viewKey];
+  var raw = rawList.slice().sort(sortByCount);
+  var prev = state.prevRanksByView[viewKey] || {};
+
+  // عند بداية الصرف: نحفظ مركز الطالب الحالي كمرساة.
+  // لكن لا نمنع طالبًا غير مصروف من تجاوز الطالب إذا أصبح رقمه أكبر.
+  raw.forEach(function(item, idx){
+    if(item.redeemed && locks[item.name] === undefined){
+      var oldRank = prev[item.name];
+      locks[item.name] = (oldRank !== undefined ? oldRank - 1 : idx);
+    }
+  });
+
+  // عند حذف عبارة الصرف، يزال القفل فورًا ويعود الطالب للترتيب الطبيعي.
+  Object.keys(locks).forEach(function(name){
+    var found = raw.some(function(item){ return item.name === name && item.redeemed; });
+    if(!found) delete locks[name];
+  });
+
+  persistFrozenRanks();
+  return raw;
+}
+
+function applyFrozenRanks(viewKey, rawList){
+  var locks = state.frozenRanksByView[viewKey];
+  var sorted = rawList.slice().sort(sortByCount);
+  var result = [];
+
+  // الطلاب غير المصروفين أصحاب الرقم الأعلى يتقدمون طبيعيًا.
+  // الطالب المصروف يحافظ على مرساته ما دام لا يوجد طالب أعلى منه.
+  var pending = sorted.filter(function(item){ return !item.redeemed; });
+  var redeemed = sorted.filter(function(item){ return item.redeemed; });
+
+  redeemed.sort(function(a,b){
+    var ra = locks[a.name];
+    var rb = locks[b.name];
+    if(a.count !== b.count) return b.count - a.count;
+    return (ra === undefined ? 999999 : ra) - (rb === undefined ? 999999 : rb);
+  });
+
+  redeemed.forEach(function(item){
+    var originalIndex = (locks[item.name] === undefined ? sorted.indexOf(item) : locks[item.name]);
+    var higherLive = pending.filter(function(other){ return other.sortCount > item.sortCount; }).length;
+    var desired = Math.max(higherLive, originalIndex);
+
+    // إذا وجد طالب أعلى، يتحرك المصروف إلى ما بعد جميع أصحاب الأرقام الأعلى.
+    // أما التغييرات أسفل مستواه فلا تغيّر مركزه.
+    var insertAt = Math.min(desired, pending.length + result.length);
+    item.__frozenInsert = insertAt;
+  });
+
+  // إدراج الطلاب المصروفين حسب المرساة، مع السماح فقط بتجاوزهم من أصحاب الأرقام الأعلى.
+  result = pending.slice();
+  redeemed.sort(function(a,b){ return (a.__frozenInsert||0) - (b.__frozenInsert||0); });
+  redeemed.forEach(function(item){
+    var pos = item.__frozenInsert || 0;
+    if(pos > result.length) pos = result.length;
+    result.splice(pos, 0, item);
+  });
+
+  result.forEach(function(item){ delete item.__frozenInsert; });
+  return result;
+}
 function currentList(viewKey){
   var v = viewKey || state.view;
   var list;
@@ -1041,12 +1009,8 @@ function currentList(viewKey){
     list = state.halaqa1.map(function(s){ return toDisplayItem(s, HALAQA1_NAME); })
       .concat(state.halaqa2.map(function(s){ return toDisplayItem(s, HALAQA2_NAME); }));
   }
-  // القاعدة النهائية:
-  // أثناء الصرف لا يتحرك الطالب بسبب طلاب أقل منه.
-  // يتحرك فقط عندما يصبح هناك طالب آخر برقم أعلى منه، وهو بالضبط
-  // ما يحققه الفرز حسب الرقم الحالي.
-  list.sort(sortByCount);
-  return list;
+  freezeRedeemedRanks(v, list);
+  return applyFrozenRanks(v, list);
 }
 
 function updateRankChanges(){
@@ -1058,7 +1022,7 @@ function updateRankChanges(){
       var oldRank = prev[s.name];
       if(oldRank !== undefined && oldRank !== newRank){
         var type = newRank < oldRank ? "up" : "down";
-        state.rankChanges[s.name] = {type:type, expireAt:Date.now()+10000};
+        state.rankChanges[s.name] = {type: type, expireAt: Date.now() + 10000};
       }
       prev[s.name] = newRank;
     });
@@ -1162,11 +1126,11 @@ function studentCardHtml(s, rank){
     ? '<span class="remaining-note">'+s.remaining+' كوبون</span>'
     : "";
   var countHtml = s.redeemed
-    ? '<div class="coupon-count redeemed-count"><span class="count-line"><b class="redeemed-total">'+s.count+'<span class="strike"></span></b><span>كوبون</span></span>'+remainingHtml+'</div>'
+    ? '<div class="coupon-count redeemed-count">'+remainingHtml+'<span class="count-line"><b>'+s.count+'<span class="strike"></span></b><span>كوبون</span></span></div>'
     : '<div class="coupon-count"><b>'+s.count+'</b><span>كوبون</span></div>';
 
   var redeemedOverlay = s.redeemed
-    ? '<div class="redeemed-overlay"><span class="redeemed-badge">تم صرف الكوبون</span></div>'
+    ? '<div class="redeemed-overlay" data-redeemed-badge="1"><span class="redeemed-badge">تم صرف الكوبون</span></div>'
     : "";
 
   return (
@@ -1196,6 +1160,23 @@ function showPage(view){
   nearestPage.classList.toggle("page-hidden", view !== "nearest");
 }
 
+function enforceRedeemedBadges(){
+  var cards = document.querySelectorAll('#listWrap .student-card.redeemed');
+  cards.forEach(function(card){
+    var wrap = card.querySelector('.tiers-row-wrap');
+    if(!wrap) return;
+    if(!wrap.querySelector('[data-redeemed-badge="1"]')){
+      var ov = document.createElement('div');
+      ov.className='redeemed-overlay';
+      ov.setAttribute('data-redeemed-badge','1');
+      var b=document.createElement('span');
+      b.className='redeemed-badge';
+      b.textContent='تم صرف الكوبون';
+      ov.appendChild(b); wrap.appendChild(ov);
+    }
+  });
+}
+
 function render(){
   buildDropdown();
   showPage(state.view);
@@ -1216,6 +1197,7 @@ function render(){
       '</div>';
     } else {
       wrap.innerHTML = list.map(function(s, idx){ return studentCardHtml(s, idx+1); }).join("");
+      enforceRedeemedBadges();
     }
   }
 }
