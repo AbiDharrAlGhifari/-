@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>ترتيب الطلاب الحاصلين على الكوبون — مجمع أبي ذر الغفاري</title>
-<meta name="coupon-engine-version" content="redeemed-lock-v7">
 <style>
 @font-face{
   font-family: 'ThmanyahSans';
@@ -464,20 +463,20 @@ main{
   backdrop-filter:blur(1.5px); -webkit-backdrop-filter:blur(1.5px);
 }
 .redeemed-overlay{
-  position:absolute !important; inset:0 !important;
+  position:absolute; inset:7px 0 0 0;
   display:flex; align-items:center; justify-content:center;
-  pointer-events:none !important; z-index:50 !important;
+  pointer-events:none; z-index:5;
   border:1px solid rgba(230,191,101,.82);
   border-radius:14px;
-  background:rgba(11,18,14,.30) !important;
+  background:rgba(11,18,14,.30);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 8px 24px rgba(0,0,0,.12);
   backdrop-filter:blur(2px);
   -webkit-backdrop-filter:blur(2px);
 }
 .redeemed-badge{
   font-family:'ThmanyahSans',Tahoma,Arial,sans-serif;
-  font-size:8px !important; line-height:1.35; font-weight:900;
-  color:#fffdf7 !important;
+  font-size:8px; line-height:1.35; font-weight:900;
+  color:#fffdf7;
   background:rgba(18,22,20,.64);
   border:1px solid rgba(230,191,101,.95);
   padding:7px 15px;
@@ -541,6 +540,17 @@ footer.site-foot{ text-align:center; padding:22px 20px 36px; color:var(--cream-f
   h1.lb-title{ font-size:17px; }
   .title-coupon-inline{ width:3.3em; margin-inline-start:.25em; }
 }
+
+/* ===== REDEMPTION MODE — final visual lock ===== */
+.student-card.redeemed .tiers-row-wrap{ position:relative !important; overflow:hidden !important; }
+.student-card.redeemed .tiers-row{ filter:blur(5px) saturate(.72) !important; }
+.student-card.redeemed .redeemed-overlay{
+  display:flex !important; visibility:visible !important; opacity:1 !important;
+  position:absolute !important; inset:7px 0 0 0 !important; z-index:999 !important;
+}
+.student-card.redeemed .redeemed-badge{ display:block !important; visibility:visible !important; opacity:1 !important; font-size:8px !important; }
+.student-card.redeemed .coupon-count.redeemed-count b{ color:var(--brass-soft) !important; }
+.student-card.redeemed .remaining-note{ color:var(--brass-soft) !important; }
 </style>
 </head>
 <body class="locked">
@@ -668,6 +678,39 @@ var SHEET_GID = "569976092";
 function gvizUrl(){
   return "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:json&gid=" + SHEET_GID + "&t=" + Date.now();
 }
+function gvizCsvUrl(){
+  return "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/gviz/tq?tqx=out:csv&gid=" + SHEET_GID + "&t=" + Date.now();
+}
+function parseCsv(text){
+  var rows=[], row=[], cell="", quoted=false;
+  for(var i=0;i<text.length;i++){
+    var ch=text[i], nx=text[i+1];
+    if(quoted){
+      if(ch==='"' && nx==='"'){ cell+='"'; i++; }
+      else if(ch==='"'){ quoted=false; }
+      else cell+=ch;
+    }else{
+      if(ch==='"') quoted=true;
+      else if(ch===','){ row.push(cell); cell=""; }
+      else if(ch==='\n'){ row.push(cell); rows.push(row); row=[]; cell=""; }
+      else if(ch==='\r'){ /* ignore CR */ }
+      else cell+=ch;
+    }
+  }
+  row.push(cell); if(row.length>1 || row[0]!=="") rows.push(row);
+  return rows;
+}
+function parseCsvData(text){
+  var rows=parseCsv(text), h1=[], h2=[];
+  rows.forEach(function(r, i){
+    if(i===0 && /^(A|الاسم|name)$/i.test(String(r[0]).trim())) return;
+    var n1=String(r[0]||"").trim(), c1=String(r[1]||"");
+    var n2=String(r[2]||"").trim(), c2=String(r[3]||"");
+    if(n1){ var e1=buildEntry(n1,{v:c1,f:c1}); if(e1) h1.push(e1); }
+    if(n2){ var e2=buildEntry(n2,{v:c2,f:c2}); if(e2) h2.push(e2); }
+  });
+  return {h1:h1,h2:h2};
+}
 
 var HALAQA1_NAME = "حلقة أبو بكر الصديق";
 var HALAQA2_NAME = "حلقة عثمان بن عفان";
@@ -713,10 +756,8 @@ function cellRawText(cell){
   var v = cell.v;
   var f = cell.f;
   var vf = (f !== null && f !== undefined) ? String(f) : "";
-  var vv = (v !== null && v !== undefined) ? String(v) : "";
   if(vf && /تم\s*صرف|كوبون/.test(normalizeDigits(vf))) return vf;
-  if(vv && /تم\s*صرف|كوبون/.test(normalizeDigits(vv))) return vv;
-  if(vv !== "") return vv;
+  if(v !== null && v !== undefined && String(v) !== "") return String(v);
   if(vf) return vf;
   return "";
 }
@@ -801,33 +842,44 @@ function parseGviz(text){
 }
 
 function loadData(silent){
-  return fetch(gvizUrl(), {cache:"no-store"})
+  // المصدر الأساسي CSV لأنّه يعيد النص الظاهر في الخلية كما هو، بما فيه
+  // "39 (تم صرف 25 كوبون)". هذا يتجنب مشكلة GViz التي قد تعيد الرقم وحده في v.
+  return fetch(gvizCsvUrl(), {cache:"no-store"})
     .then(function(res){
-      if(!res.ok) throw new Error("bad status " + res.status);
+      if(!res.ok) throw new Error("bad CSV status " + res.status);
       return res.text();
     })
     .then(function(text){
-      var parsed = parseGviz(text);
-      if(parsed.h1.length === 0 && parsed.h2.length === 0) throw new Error("empty sheet");
-      state.halaqa1 = parsed.h1;
-      state.halaqa2 = parsed.h2;
-      state.lastUpdated = new Date();
-      state.usingFallback = false;
+      var parsed=parseCsvData(text);
+      if(parsed.h1.length===0 && parsed.h2.length===0) throw new Error("empty CSV sheet");
+      state.halaqa1=parsed.h1; state.halaqa2=parsed.h2;
+      state.lastUpdated=new Date(); state.usingFallback=false;
       updateRankChanges();
       return true;
     })
-    .catch(function(err){
-      if(!silent) console.warn("تعذّر تحميل بيانات الشيت مباشرة، سيتم استخدام آخر نسخة محفوظة:", err);
-      if(state.halaqa1.length === 0 && state.halaqa2.length === 0){
-        state.halaqa1 = window.FALLBACK_DATA.h1.slice();
-        state.halaqa2 = window.FALLBACK_DATA.h2.slice();
-        state.lastUpdated = new Date(window.FALLBACK_DATA.savedAt);
-        state.usingFallback = true;
-      }
-      return false;
+    .catch(function(csvErr){
+      // احتياط ثانٍ: GViz JSON القديم.
+      return fetch(gvizUrl(), {cache:"no-store"})
+        .then(function(res){ if(!res.ok) throw new Error("bad JSON status " + res.status); return res.text(); })
+        .then(function(text){
+          var parsed=parseGviz(text);
+          if(parsed.h1.length===0 && parsed.h2.length===0) throw new Error("empty JSON sheet");
+          state.halaqa1=parsed.h1; state.halaqa2=parsed.h2;
+          state.lastUpdated=new Date(); state.usingFallback=false;
+          updateRankChanges(); return true;
+        })
+        .catch(function(err){
+          if(!silent) console.warn("تعذّر تحميل Google Sheets، سيتم استخدام آخر نسخة محفوظة:", csvErr, err);
+          if(state.halaqa1.length===0 && state.halaqa2.length===0){
+            state.halaqa1=window.FALLBACK_DATA.h1.slice();
+            state.halaqa2=window.FALLBACK_DATA.h2.slice();
+            state.lastUpdated=new Date(window.FALLBACK_DATA.savedAt);
+            state.usingFallback=true;
+          }
+          return false;
+        });
     });
 }
-
 function fmtDate(d){
   if(!d) return "";
   try{
@@ -1130,7 +1182,7 @@ function studentCardHtml(s, rank){
     : '<div class="coupon-count"><b>'+s.count+'</b><span>كوبون</span></div>';
 
   var redeemedOverlay = s.redeemed
-    ? '<div class="redeemed-overlay" data-redeemed-badge="1"><span class="redeemed-badge">تم صرف الكوبون</span></div>'
+    ? '<div class="redeemed-overlay"><span class="redeemed-badge">تم صرف الكوبون</span></div>'
     : "";
 
   return (
@@ -1160,23 +1212,6 @@ function showPage(view){
   nearestPage.classList.toggle("page-hidden", view !== "nearest");
 }
 
-function enforceRedeemedBadges(){
-  var cards = document.querySelectorAll('#listWrap .student-card.redeemed');
-  cards.forEach(function(card){
-    var wrap = card.querySelector('.tiers-row-wrap');
-    if(!wrap) return;
-    if(!wrap.querySelector('[data-redeemed-badge="1"]')){
-      var ov = document.createElement('div');
-      ov.className='redeemed-overlay';
-      ov.setAttribute('data-redeemed-badge','1');
-      var b=document.createElement('span');
-      b.className='redeemed-badge';
-      b.textContent='تم صرف الكوبون';
-      ov.appendChild(b); wrap.appendChild(ov);
-    }
-  });
-}
-
 function render(){
   buildDropdown();
   showPage(state.view);
@@ -1197,7 +1232,7 @@ function render(){
       '</div>';
     } else {
       wrap.innerHTML = list.map(function(s, idx){ return studentCardHtml(s, idx+1); }).join("");
-      enforceRedeemedBadges();
+      enforceRedemptionVisuals();
     }
   }
 }
@@ -1206,6 +1241,21 @@ function injectAssets(){
   document.getElementById("splashLogo").src = window.ASSETS.logo;
   document.getElementById("headerLogo").src = window.ASSETS.logo;
   document.getElementById("couponFlagImg").src = window.ASSETS.coupon;
+}
+
+function enforceRedemptionVisuals(){
+  document.querySelectorAll('.student-card[data-redeemed="1"]').forEach(function(card){
+    card.classList.add('redeemed');
+    var wrap=card.querySelector('.tiers-row-wrap');
+    if(!wrap) return;
+    var overlay=wrap.querySelector('.redeemed-overlay');
+    if(!overlay){
+      overlay=document.createElement('div');
+      overlay.className='redeemed-overlay';
+      overlay.innerHTML='<span class="redeemed-badge">تم صرف الكوبون</span>';
+      wrap.appendChild(overlay);
+    }
+  });
 }
 
 function bindUi(){
