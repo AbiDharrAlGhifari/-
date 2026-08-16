@@ -767,6 +767,7 @@ function buildEntry(name, countCell){
 function parseGviz(text){
   var start = text.indexOf("(");
   var end = text.lastIndexOf(")");
+  if(start < 0 || end <= start) throw new Error("invalid gviz response");
   var jsonStr = text.substring(start+1, end);
   var data = JSON.parse(jsonStr);
   var rows = data.table.rows || [];
@@ -775,46 +776,168 @@ function parseGviz(text){
     var c = r.c || [];
     var rawN1 = cellRawText(c[0]).trim();
     var rawN2 = cellRawText(c[3]).trim();
-    if(rawN1){
+
+    if(rawN1 && !/^(الاسم|اسم)$/i.test(rawN1)){
       var e1 = buildEntry(rawN1, c[1]);
+      // Some GViz responses omit a cell's formatted value from `c[1]`.
+      // Search the rest of the row for the visible redemption phrase before
+      // giving up, so the student can never disappear just because of GViz
+      // cell sparsity.
+      if(!e1){
+        for(var i=1;i<c.length;i++){
+          var candidate=cellRawText(c[i]);
+          var red=parseRedemptionText(candidate);
+          if(red){
+            e1={name:rawN1,count:red.total,redeemed:true,remaining:red.remaining,spentAmount:red.spent};
+            break;
+          }
+        }
+      }
+      if(!e1 && c[1]){
+        var n1=digitsIn(cellRawText(c[1]));
+        if(n1!==null) e1={name:rawN1,count:n1,redeemed:false};
+      }
       if(e1) h1.push(e1);
     }
-    if(rawN2){
+
+    if(rawN2 && !/^(الاسم|اسم)$/i.test(rawN2)){
       var e2 = buildEntry(rawN2, c[4]);
+      if(!e2){
+        for(var j=4;j<c.length;j++){
+          var candidate2=cellRawText(c[j]);
+          var red2=parseRedemptionText(candidate2);
+          if(red2){
+            e2={name:rawN2,count:red2.total,redeemed:true,remaining:red2.remaining,spentAmount:red2.spent};
+            break;
+          }
+        }
+      }
+      if(!e2 && c[4]){
+        var n2=digitsIn(cellRawText(c[4]));
+        if(n2!==null) e2={name:rawN2,count:n2,redeemed:false};
+      }
       if(e2) h2.push(e2);
     }
   });
-  return {h1:h1, h2:h2};
+  return {h1:h1,h2:h2};
+}
+function csvUrl(){
+  return "https://docs.google.com/spreadsheets/d/" + SHEET_ID + "/export?format=csv&gid=" + SHEET_GID + "&t=" + Date.now();
+}
+
+function parseCsvLine(line){
+  var out=[], cur="", quoted=false;
+  for(var i=0;i<line.length;i++){
+    var ch=line[i];
+    if(ch==='"'){
+      if(quoted && line[i+1]==='"'){ cur+='"'; i++; }
+      else quoted=!quoted;
+    }else if(ch===',' && !quoted){ out.push(cur); cur=""; }
+    else cur+=ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+function parseCsv(text){
+  var rows=[], row=[], field="", quoted=false;
+  for(var i=0;i<text.length;i++){
+    var ch=text[i];
+    if(ch==='"'){
+      if(quoted && text[i+1]==='"'){ field+='"'; i++; }
+      else quoted=!quoted;
+    }else if(ch===',' && !quoted){ row.push(field); field=""; }
+    else if((ch==='\n' || ch==='\r') && !quoted){
+      if(ch==='\r' && text[i+1]==='\n') i++;
+      row.push(field); field="";
+      if(row.some(function(x){ return String(x).trim()!==""; })) rows.push(row);
+      row=[];
+    }else field+=ch;
+  }
+  if(field!=="" || row.length){ row.push(field); if(row.some(function(x){return String(x).trim()!=="";})) rows.push(row); }
+  return rows;
+}
+
+function parseCsvData(text){
+  var rows=parseCsv(text), h1=[], h2=[];
+  rows.forEach(function(r){
+    var rawN1=String(r[0]||"").trim();
+    var rawN2=String(r[3]||"").trim();
+    if(rawN1 && !/^(الاسم|اسم)$/i.test(rawN1)){
+      var e1=buildEntry(rawN1, r[1]||"");
+      if(e1) h1.push(e1);
+    }
+    if(rawN2 && !/^(الاسم|اسم)$/i.test(rawN2)){
+      var e2=buildEntry(rawN2, r[4]||"");
+      if(e2) h2.push(e2);
+    }
+  });
+  return {h1:h1,h2:h2};
+}
+
+function mergeLists(primary, secondary){
+  var map={};
+  primary.forEach(function(x){ map[x.name]=x; });
+  secondary.forEach(function(x){
+    var cur=map[x.name];
+    // A parsed redemption state is authoritative over a plain numeric state.
+    // This prevents a GViz numeric `v` value from hiding a visible
+    // "39 (تم صرف 25 كوبون)" value returned by another feed/fallback.
+    if(!cur || (x.redeemed && !cur.redeemed)) map[x.name]=x;
+  });
+  return Object.keys(map).map(function(k){return map[k];});
+}
+
+function mergeParsed(primary, secondary){
+  return {
+    h1:mergeLists(primary.h1, secondary.h1),
+    h2:mergeLists(primary.h2, secondary.h2)
+  };
 }
 
 function loadData(silent){
-  return fetch(gvizUrl(), {cache:"no-store"})
-    .then(function(res){
-      if(!res.ok) throw new Error("bad status " + res.status);
-      return res.text();
-    })
-    .then(function(text){
-      var parsed = parseGviz(text);
-      if(parsed.h1.length === 0 && parsed.h2.length === 0) throw new Error("empty sheet");
-      state.halaqa1 = parsed.h1;
-      state.halaqa2 = parsed.h2;
-      state.lastUpdated = new Date();
-      state.usingFallback = false;
-      updateRankChanges();
-      return true;
-    })
-    .catch(function(err){
-      if(!silent) console.warn("تعذّر تحميل بيانات الشيت مباشرة، سيتم استخدام آخر نسخة محفوظة:", err);
-      if(state.halaqa1.length === 0 && state.halaqa2.length === 0){
-        state.halaqa1 = window.FALLBACK_DATA.h1.slice();
-        state.halaqa2 = window.FALLBACK_DATA.h2.slice();
-        state.lastUpdated = new Date(window.FALLBACK_DATA.savedAt);
-        state.usingFallback = true;
-      }
-      return false;
-    });
-}
+  var csvPromise=fetch(csvUrl(), {cache:"no-store"}).then(function(res){
+    if(!res.ok) throw new Error("csv status " + res.status);
+    return res.text();
+  }).then(parseCsvData);
 
+  var gvizPromise=fetch(gvizUrl(), {cache:"no-store"}).then(function(res){
+    if(!res.ok) throw new Error("gviz status " + res.status);
+    return res.text();
+  }).then(parseGviz);
+
+  return Promise.allSettled([csvPromise, gvizPromise]).then(function(results){
+    var csvData=results[0].status==='fulfilled' ? results[0].value : {h1:[],h2:[]};
+    var gvizData=results[1].status==='fulfilled' ? results[1].value : {h1:[],h2:[]};
+    var parsed=mergeParsed(csvData, gvizData);
+
+    // Never let one malformed row make a student disappear. If the live feed
+    // omitted a known student, retain the last known value or the bundled
+    // fallback until the next successful refresh.
+    var known1=state.halaqa1.length ? state.halaqa1 : window.FALLBACK_DATA.h1;
+    var known2=state.halaqa2.length ? state.halaqa2 : window.FALLBACK_DATA.h2;
+    parsed.h1=mergeLists(parsed.h1, known1);
+    parsed.h2=mergeLists(parsed.h2, known2);
+
+    if(parsed.h1.length===0 && parsed.h2.length===0) throw new Error("empty sheet");
+
+    state.halaqa1=parsed.h1;
+    state.halaqa2=parsed.h2;
+    state.lastUpdated=new Date();
+    state.usingFallback=(results[0].status!=='fulfilled' && results[1].status!=='fulfilled');
+    updateRankChanges();
+    return true;
+  }).catch(function(err){
+    if(!silent) console.warn("تعذّر تحميل بيانات الشيت، سيتم استخدام آخر نسخة محفوظة:",err);
+    if(state.halaqa1.length===0 && state.halaqa2.length===0){
+      state.halaqa1=window.FALLBACK_DATA.h1.slice();
+      state.halaqa2=window.FALLBACK_DATA.h2.slice();
+      state.lastUpdated=new Date(window.FALLBACK_DATA.savedAt);
+      state.usingFallback=true;
+    }
+    return false;
+  });
+}
 function fmtDate(d){
   if(!d) return "";
   try{
