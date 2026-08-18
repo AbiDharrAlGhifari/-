@@ -525,13 +525,19 @@ footer.site-foot{ text-align:center; padding:22px 20px 36px; color:var(--cream-f
 
 /* ===== Golden gift — 40 coupons celebration ===== */
 .golden-gift-hero{ position:relative; display:flex; flex-direction:column; align-items:center; padding:20px 10px 16px; overflow:hidden; border-radius:16px;
-  background: radial-gradient(120% 160% at 50% 0%, rgba(212,175,72,0.22), transparent 62%), rgba(255,255,255,0.02);
-  border:1px solid rgba(230,191,101,0.35); }
-.gg-glow{ position:absolute; top:6px; left:50%; transform:translateX(-50%); width:200px; height:130px;
-  background: radial-gradient(circle, rgba(255,214,110,0.38), transparent 70%); filter:blur(6px);
-  animation: ggPulse 3s ease-in-out infinite; pointer-events:none; }
+  background: radial-gradient(120% 160% at 50% 0%, rgba(212,175,72,0.22), transparent 62%), rgba(255,255,255,0.02); }
+.gg-glow{ display:none; }
 @keyframes ggPulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
 .gg-box{ position:relative; width:132px; z-index:2; }
+.gg-box::before{ content:""; position:absolute; top:50%; left:50%; width:215px; height:215px; transform:translate(-50%,-50%);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,214,110,0.42), transparent 62%),
+    radial-gradient(circle at 40% 36%, rgba(255,246,214,0.55), transparent 24%),
+    radial-gradient(circle at 66% 62%, rgba(230,191,101,0.5), transparent 26%),
+    radial-gradient(circle at 30% 70%, rgba(255,223,140,0.4), transparent 20%),
+    radial-gradient(circle at 72% 32%, rgba(255,255,255,0.35), transparent 16%);
+  filter: blur(11px); z-index:-1;
+  animation: ggPulse 3s ease-in-out infinite; pointer-events:none; }
 .gg-box img{ width:100%; display:block; transform-origin:50% 88%;
   filter: drop-shadow(0 10px 22px rgba(212,175,72,0.45));
   animation: ggFloat 3s ease-in-out infinite; }
@@ -1267,7 +1273,7 @@ function goldenGiftHeroHtml(){
     '<div class="gg-glow"></div>' +
     '<div class="gg-confetti">'+pieces+'</div>' +
     '<div class="gg-box"><img src="'+window.ASSETS.goldenGift+'" alt="الجائزة الكبرى"></div>' +
-    '<div class="gg-text">ما شاء الله، الأربعون كاملة!<br>الجائزة الكبرى لك 🏆</div>' +
+    '<div class="gg-text">الجائزة الكبرى صارت من نصيبك 🏆<br>كفّيت ووفّيت بـ 40 كوبون ما شاء الله!</div>' +
   '</div>';
 }
 
