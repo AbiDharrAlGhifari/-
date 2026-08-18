@@ -527,36 +527,9 @@ footer.site-foot{ text-align:center; padding:22px 20px 36px; color:var(--cream-f
 .golden-gift-hero{ position:relative; display:flex; flex-direction:column; align-items:center; padding:20px 10px 16px; overflow:hidden; border-radius:16px;
   background: radial-gradient(120% 160% at 50% 0%, rgba(212,175,72,0.22), transparent 62%), rgba(255,255,255,0.02);
   border:1px solid rgba(230,191,101,0.35); }
-.gg-glow{
-  position:absolute;
-  top:0;
-  left:50%;
-  transform:translateX(-50%);
-  width:140px;
-  height:140px;
-  pointer-events:none;
-
-  background:
-    linear-gradient(115deg,
-      rgba(255,230,150,0.25) 20%,
-      rgba(255,240,200,0.45) 40%,
-      rgba(255,220,140,0.25) 60%
-    );
-
-  background-size:220% 100%;
-  mix-blend-mode:screen;
-  filter:blur(18px);
-  opacity:0.85;
-
-  animation: ggGlowSlide 3s ease-in-out infinite;
-}
-
-@keyframes ggGlowSlide{
-  0%{ background-position:120% 0; opacity:0.7; }
-  50%{ background-position:-20% 0; opacity:1; }
-  100%{ background-position:120% 0; opacity:0.7; }
-}
-
+.gg-glow{ position:absolute; top:6px; left:50%; transform:translateX(-50%); width:200px; height:130px;
+  background: radial-gradient(circle, rgba(255,214,110,0.38), transparent 70%); filter:blur(6px);
+  animation: ggPulse 3s ease-in-out infinite; pointer-events:none; }
 @keyframes ggPulse{ 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
 .gg-box{ position:relative; width:132px; z-index:2; }
 .gg-box img{ width:100%; display:block; transform-origin:50% 88%;
@@ -1294,7 +1267,7 @@ function goldenGiftHeroHtml(){
     '<div class="gg-glow"></div>' +
     '<div class="gg-confetti">'+pieces+'</div>' +
     '<div class="gg-box"><img src="'+window.ASSETS.goldenGift+'" alt="الجائزة الكبرى"></div>' +
-    <div class="gg-text">الجائزة الكبرى صارت من نصيبك 🏆<br>كفّيت ووفّيت بـ 40 كوبون ما شاء الله!</div>
+    '<div class="gg-text">ما شاء الله، الأربعون كاملة!<br>الجائزة الكبرى لك 🏆</div>' +
   '</div>';
 }
 
