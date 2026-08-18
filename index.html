@@ -546,6 +546,14 @@ footer.site-foot{ text-align:center; padding:22px 20px 36px; color:var(--cream-f
   background: linear-gradient(115deg, transparent 32%, rgba(255,255,240,0.6) 48%, transparent 64%);
   background-size:260% 100%; animation: ggShine 2.6s linear infinite; }
 @keyframes ggShine{ 0%{ background-position:135% 0; } 100%{ background-position:-125% 0; } }
+.gg-lid-light{ position:absolute; top:12px; left:50%; width:150px; height:88px; z-index:3; pointer-events:none;
+  transform:translateX(-50%) scaleY(0.9); transform-origin:50% 100%;
+  clip-path: polygon(24% 100%, 76% 100%, 100% 0%, 0% 0%);
+  background: linear-gradient(0deg, rgba(255,250,222,0.95), rgba(255,214,110,0.6) 40%, transparent 78%);
+  filter: blur(2.5px);
+  animation: lidLightPulse 2.2s ease-in-out infinite; }
+@keyframes lidLightPulse{ 0%,100%{ opacity:.45; transform:translateX(-50%) scaleY(0.85); }
+  50%{ opacity:1; transform:translateX(-50%) scaleY(1.18); } }
 .gg-text{ position:relative; z-index:2; margin-top:11px; font-family:'ThmanyahSans'; font-weight:900; font-size:15px;
   color:var(--brass-soft); text-shadow:0 0 16px rgba(212,175,72,0.5); text-align:center; line-height:1.6; }
 .gg-confetti{ position:absolute; inset:0; pointer-events:none; z-index:1; }
@@ -1272,6 +1280,7 @@ function goldenGiftHeroHtml(){
   return '<div class="golden-gift-hero">' +
     '<div class="gg-glow"></div>' +
     '<div class="gg-confetti">'+pieces+'</div>' +
+    '<div class="gg-lid-light"></div>' +
     '<div class="gg-box"><img src="'+window.ASSETS.goldenGift+'" alt="الجائزة الكبرى"></div>' +
     '<div class="gg-text">الجائزة الكبرى صارت من نصيبك 🏆<br>كفّيت ووفّيت بـ 40 كوبون ما شاء الله!</div>' +
   '</div>';
